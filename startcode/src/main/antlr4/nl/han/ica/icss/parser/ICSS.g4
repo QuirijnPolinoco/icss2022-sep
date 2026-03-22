@@ -42,8 +42,35 @@ MUL: '*';
 ASSIGNMENT_OPERATOR: ':=';
 
 
+//--- PARSER: --
+stylesheet: ( variableAssignment | styleRule )* EOF;
 
+styleRule: selector OPEN_BRACE ruleBody CLOSE_BRACE;
 
-//--- PARSER: ---
-stylesheet: EOF;
+// Body of a stylesheet block: declarations, nested if, or variable assignments.
+ruleBody: ( declaration | ifClause | variableAssignment )*;
 
+declaration: propertyName COLON expression SEMICOLON;
+propertyName: LOWER_IDENT;
+selector: classSelector | idSelector | tagSelector;
+classSelector: CLASS_IDENT;
+idSelector: ID_IDENT;
+tagSelector: LOWER_IDENT;
+
+variableAssignment: variableReference ASSIGNMENT_OPERATOR expression SEMICOLON;
+variableReference: CAPITAL_IDENT;
+
+// if [ guard ] { ... } [ else { ... } ]
+ifClause: IF BOX_BRACKET_OPEN ifGuard BOX_BRACKET_CLOSE OPEN_BRACE ruleBody CLOSE_BRACE elseClause?;
+
+// Separate rule so the listener can bind the condition without ambiguity.
+ifGuard: expression;
+elseClause: ELSE OPEN_BRACE ruleBody CLOSE_BRACE;
+
+// --- Expressions (bottom-up: primary -> multiply -> add/sub, left-associative) ---
+
+expression: additiveExpression;
+additiveExpression: multiplicativeExpression ( ( PLUS | MIN ) multiplicativeExpression )*;
+multiplicativeExpression: primaryExpression ( MUL primaryExpression )*;
+primaryExpression: literal | variableReference;
+literal : TRUE | FALSE | COLOR | PIXELSIZE | PERCENTAGE | SCALAR;
