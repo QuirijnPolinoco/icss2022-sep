@@ -9,6 +9,7 @@ import nl.han.ica.icss.ast.ElseClause;
 import nl.han.ica.icss.ast.Expression;
 import nl.han.ica.icss.ast.IfClause;
 import nl.han.ica.icss.ast.Literal;
+import nl.han.ica.icss.ast.Operation;
 import nl.han.ica.icss.ast.Selector;
 import nl.han.ica.icss.ast.Stylerule;
 import nl.han.ica.icss.ast.Stylesheet;
@@ -19,6 +20,9 @@ import nl.han.ica.icss.ast.literals.ColorLiteral;
 import nl.han.ica.icss.ast.literals.PercentageLiteral;
 import nl.han.ica.icss.ast.literals.PixelLiteral;
 import nl.han.ica.icss.ast.literals.ScalarLiteral;
+import nl.han.ica.icss.ast.operations.AddOperation;
+import nl.han.ica.icss.ast.operations.MultiplyOperation;
+import nl.han.ica.icss.ast.operations.SubtractOperation;
 import nl.han.ica.icss.ast.types.ExpressionType;
 
 import java.util.HashMap;
@@ -134,6 +138,9 @@ public class Checker {
         if (expression instanceof VariableReference) {
             return inferReferenceType((VariableReference) expression);
         }
+        if (expression instanceof Operation) {
+            return inferOperationType((Operation) expression);
+        }
         return ExpressionType.UNDEFINED;
     }
 
@@ -148,6 +155,66 @@ public class Checker {
             return ExpressionType.UNDEFINED;
         }
         return foundType;
+    }
+
+    private ExpressionType inferOperationType(Operation operation) {
+        ExpressionType lhsType = inferType(operation.lhs);
+        ExpressionType rhsType = inferType(operation.rhs);
+
+        if (operation instanceof AddOperation || operation instanceof SubtractOperation) {
+            return checkAddSubtractType(operation, lhsType, rhsType);
+        }
+        if (operation instanceof MultiplyOperation) {
+            return checkMultiplyType(operation, lhsType, rhsType);
+        }
+        return ExpressionType.UNDEFINED;
+    }
+
+    private ExpressionType checkAddSubtractType(Expression operationNode, ExpressionType lhsType,
+            ExpressionType rhsType) {
+        if (lhsType == ExpressionType.UNDEFINED || rhsType == ExpressionType.UNDEFINED) {
+            return ExpressionType.UNDEFINED;
+        }
+
+        if (isIllegalArithmeticType(lhsType) || isIllegalArithmeticType(rhsType)) {
+            operationNode.setError("Color and boolean values cannot be used in arithmetic operations.");
+            return ExpressionType.UNDEFINED;
+        }
+
+        if (lhsType != rhsType) {
+            operationNode.setError("Both operands of + or - must have the same type.");
+            return ExpressionType.UNDEFINED;
+        }
+
+        return lhsType;
+    }
+
+    private ExpressionType checkMultiplyType(Expression operationNode, ExpressionType lhsType, ExpressionType rhsType) {
+        if (lhsType == ExpressionType.UNDEFINED || rhsType == ExpressionType.UNDEFINED) {
+            return ExpressionType.UNDEFINED;
+        }
+
+        if (isIllegalArithmeticType(lhsType) || isIllegalArithmeticType(rhsType)) {
+            operationNode.setError("Color and boolean values cannot be used in arithmetic operations.");
+            return ExpressionType.UNDEFINED;
+        }
+
+        if (lhsType == ExpressionType.SCALAR && rhsType == ExpressionType.SCALAR) {
+            return ExpressionType.SCALAR;
+        }
+        if (lhsType == ExpressionType.SCALAR) {
+            return rhsType;
+        }
+        if (rhsType == ExpressionType.SCALAR) {
+            return lhsType;
+        }
+
+        operationNode.setError("Multiplication requires at least one scalar operand.");
+        return ExpressionType.UNDEFINED;
+    }
+
+    private boolean isIllegalArithmeticType(ExpressionType type) {
+        return type == ExpressionType.COLOR || type == ExpressionType.BOOL;
     }
 
     private ExpressionType typeOfLiteral(Literal literal) {
