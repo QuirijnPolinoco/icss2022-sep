@@ -123,7 +123,20 @@ public class Checker {
     }
 
     private void checkDeclaration(Declaration declaration) {
-        inferType(declaration.expression);
+        ExpressionType type = inferType(declaration.expression);
+        String property = declaration.property.name;
+
+        if (isColorProperty(property)) {
+            if (type != ExpressionType.COLOR && type != ExpressionType.UNDEFINED) {
+                declaration.setError("Value type does not match property.");
+            }
+            return;
+        }
+        if (isSizeProperty(property)) {
+            if (type != ExpressionType.PIXEL && type != ExpressionType.PERCENTAGE && type != ExpressionType.UNDEFINED) {
+                declaration.setError("Value type does not match property.");
+            }
+        }
     }
 
     // Type inference
@@ -215,6 +228,14 @@ public class Checker {
 
     private boolean isIllegalArithmeticType(ExpressionType type) {
         return type == ExpressionType.COLOR || type == ExpressionType.BOOL;
+    }
+
+    private boolean isColorProperty(String property) {
+        return "color".equals(property) || "background-color".equals(property);
+    }
+
+    private boolean isSizeProperty(String property) {
+        return "width".equals(property) || "height".equals(property);
     }
 
     private ExpressionType typeOfLiteral(Literal literal) {
