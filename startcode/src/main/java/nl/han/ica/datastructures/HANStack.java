@@ -8,6 +8,10 @@ public class HANStack<T> implements IHANStack<T> {
         this.stack = new HANLinkedList<>();
     }
 
+    public boolean isEmpty() {
+        return stack.getSize() == 0;
+    }
+
     @Override
     public void push(T value) {
         stack.addFirst(value);

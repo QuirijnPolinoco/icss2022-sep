@@ -79,9 +79,6 @@ public class ASTListener extends ICSSBaseListener {
 
 	private List<Integer> readAdditiveOperators(ICSSParser.AdditiveExpressionContext ctx) {
 		List<Integer> operators = new ArrayList<>();
-		if (ctx.children == null) {
-			return operators;
-		}
 		for (ParseTree child : ctx.children) {
 			if (child instanceof TerminalNode) {
 				Token token = ((TerminalNode) child).getSymbol();
@@ -160,7 +157,7 @@ public class ASTListener extends ICSSBaseListener {
 
 	@Override
 	public void exitVariableReference(ICSSParser.VariableReferenceContext ctx) {
-		// In "variableAssignment: variableReference := expression", the first
+		// In "variableAssignment: variableReference := additiveExpression", the first
 		// variableReference is the assigned name and not part of the expression.
 		if (ctx.getParent() instanceof ICSSParser.VariableAssignmentContext) {
 			addNodeToCurrentContainer(new VariableReference(ctx.getText()));
@@ -194,38 +191,29 @@ public class ASTListener extends ICSSBaseListener {
 	}
 
 	@Override
-	public void exitIfGuard(ICSSParser.IfGuardContext ctx) {
-		ASTNode node = currentNode();
-		if (!(node instanceof IfClause)) {
-			throw new IllegalStateException("If-guard must attach to an IfClause.");
-		}
-		node.addChild(popExpression("if guard"));
-	}
-
-	@Override
 	public void exitLiteral(ICSSParser.LiteralContext ctx) {
 		String text = ctx.getText();
 		switch (ctx.getStart().getType()) {
-		case ICSSParser.TRUE:
-			expressionStack.push(new BoolLiteral(true));
-			break;
-		case ICSSParser.FALSE:
-			expressionStack.push(new BoolLiteral(false));
-			break;
-		case ICSSParser.COLOR:
-			expressionStack.push(new ColorLiteral(text));
-			break;
-		case ICSSParser.PIXELSIZE:
-			expressionStack.push(new PixelLiteral(text));
-			break;
-		case ICSSParser.PERCENTAGE:
-			expressionStack.push(new PercentageLiteral(text));
-			break;
-		case ICSSParser.SCALAR:
-			expressionStack.push(new ScalarLiteral(text));
-			break;
-		default:
-			throw new IllegalStateException("Unknown literal token: " + text);
+			case ICSSParser.TRUE:
+				expressionStack.push(new BoolLiteral(true));
+				break;
+			case ICSSParser.FALSE:
+				expressionStack.push(new BoolLiteral(false));
+				break;
+			case ICSSParser.COLOR:
+				expressionStack.push(new ColorLiteral(text));
+				break;
+			case ICSSParser.PIXELSIZE:
+				expressionStack.push(new PixelLiteral(text));
+				break;
+			case ICSSParser.PERCENTAGE:
+				expressionStack.push(new PercentageLiteral(text));
+				break;
+			case ICSSParser.SCALAR:
+				expressionStack.push(new ScalarLiteral(text));
+				break;
+			default:
+				throw new IllegalStateException("Unknown literal token: " + text);
 		}
 	}
 
@@ -250,31 +238,37 @@ public class ASTListener extends ICSSBaseListener {
 	@Override
 	public void exitAdditiveExpression(ICSSParser.AdditiveExpressionContext ctx) {
 		int operandCount = ctx.multiplicativeExpression().size();
-		if (operandCount <= 1) {
-			return;
-		}
-
-		Expression[] operands = popExpressionsInOrder(operandCount, "addition/subtraction");
-		List<Integer> operators = readAdditiveOperators(ctx);
-		if (operators.size() != operandCount - 1) {
-			throw new IllegalStateException("Mismatch between additive operands and operators.");
-		}
-
-		Expression result = operands[0];
-		for (int i = 1; i < operands.length; i++) {
-			int op = operators.get(i - 1);
-			if (op == ICSSParser.PLUS) {
-				AddOperation add = new AddOperation();
-				add.addChild(result);
-				add.addChild(operands[i]);
-				result = add;
-			} else {
-				SubtractOperation sub = new SubtractOperation();
-				sub.addChild(result);
-				sub.addChild(operands[i]);
-				result = sub;
+		if (operandCount > 1) {
+			Expression[] operands = popExpressionsInOrder(operandCount, "addition/subtraction");
+			List<Integer> operators = readAdditiveOperators(ctx);
+			if (operators.size() != operandCount - 1) {
+				throw new IllegalStateException("Mismatch between additive operands and operators.");
 			}
+
+			Expression result = operands[0];
+			for (int i = 1; i < operands.length; i++) {
+				int op = operators.get(i - 1);
+				if (op == ICSSParser.PLUS) {
+					AddOperation add = new AddOperation();
+					add.addChild(result);
+					add.addChild(operands[i]);
+					result = add;
+				} else {
+					SubtractOperation sub = new SubtractOperation();
+					sub.addChild(result);
+					sub.addChild(operands[i]);
+					result = sub;
+				}
+			}
+			expressionStack.push(result);
 		}
-		expressionStack.push(result);
+
+		if (ctx.getParent() instanceof ICSSParser.IfClauseContext) {
+			ASTNode node = currentNode();
+			if (!(node instanceof IfClause)) {
+				throw new IllegalStateException("If condition must attach to an IfClause.");
+			}
+			node.addChild(popExpression("if condition"));
+		}
 	}
 }

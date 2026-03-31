@@ -15,6 +15,10 @@ public class HANLinkedList<T> implements IHANLinkedList<T> {
         }
     }
 
+    public boolean isEmpty() {
+        return size == 0;
+    }
+
     @Override
     public void addFirst(T value) {
         head = new ListNode<>(value, head);
