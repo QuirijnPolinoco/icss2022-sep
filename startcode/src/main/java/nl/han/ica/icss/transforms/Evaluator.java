@@ -67,7 +67,15 @@ public class Evaluator implements Transform {
             ASTNode node = stylerule.body.get(index);
             if (node instanceof IfClause) {
                 IfClause ifClause = (IfClause) node;
-                boolean takeIfBranch = asBoolean(evalExpression(ifClause.conditionalExpression));
+                Literal cond = evalExpression(ifClause.conditionalExpression);
+                boolean takeIfBranch = false;
+                if (cond instanceof BoolLiteral) {
+                    takeIfBranch = ((BoolLiteral) cond).value;
+                } else {
+                    ifClause.setError(cond == null
+                            ? "Could not evaluate if condition."
+                            : "If condition must be a boolean value.");
+                }
                 stylerule.body.remove(index);
 
                 ArrayList<ASTNode> chosenBranch = takeIfBranch
@@ -82,7 +90,7 @@ public class Evaluator implements Transform {
                         stylerule.body.add(index + branchIndex, branchNode);
                     } else if (branchNode instanceof Declaration) {
                         Declaration declaration = (Declaration) branchNode;
-                        declaration.expression = evalExpression(declaration.expression);
+                        applyEvaluatedExpression(declaration);
                         stylerule.body.add(index + branchIndex, declaration);
                     } else if (branchNode instanceof IfClause) {
                         stylerule.body.add(index + branchIndex, branchNode);
@@ -95,8 +103,7 @@ public class Evaluator implements Transform {
             }
 
             if (node instanceof Declaration) {
-                Declaration declaration = (Declaration) node;
-                declaration.expression = evalExpression(declaration.expression);
+                applyEvaluatedExpression((Declaration) node);
                 index++;
                 continue;
             }
@@ -110,47 +117,67 @@ public class Evaluator implements Transform {
         popScope();
     }
 
+    private void applyEvaluatedExpression(Declaration declaration) {
+        Literal result = evalExpression(declaration.expression);
+        if (result == null) {
+            declaration.setError("Could not evaluate declaration value.");
+        } else {
+            declaration.expression = result;
+        }
+    }
+
     private void evalVariableAssignment(VariableAssignment assignment) {
         Literal value = evalExpression(assignment.expression);
-        assignment.expression = copyLiteral(value);
+        if (value == null) {
+            assignment.setError("Could not evaluate variable value.");
+            return;
+        }
+        assignment.expression = value;
         variableValues.getFirst().put(assignment.name.name, copyLiteral(value));
     }
 
     private Literal evalExpression(Expression expression) {
+        if (expression == null) {
+            return null;
+        }
         if (expression instanceof Literal) {
             return copyLiteral((Literal) expression);
         }
         if (expression instanceof VariableReference) {
-            return lookup(((VariableReference) expression).name);
+            VariableReference ref = (VariableReference) expression;
+            Literal value = lookupVariable(ref.name);
+            if (value == null) {
+                ref.setError("Variable has no value at evaluation time.");
+                return null;
+            }
+            return copyLiteral(value);
         }
         if (expression instanceof AddOperation) {
             AddOperation operation = (AddOperation) expression;
-            return add(evalExpression(operation.lhs), evalExpression(operation.rhs));
+            Literal left = evalExpression(operation.lhs);
+            Literal right = evalExpression(operation.rhs);
+            return add(operation, left, right);
         }
         if (expression instanceof SubtractOperation) {
             SubtractOperation operation = (SubtractOperation) expression;
-            return subtract(evalExpression(operation.lhs), evalExpression(operation.rhs));
+            Literal left = evalExpression(operation.lhs);
+            Literal right = evalExpression(operation.rhs);
+            return subtract(operation, left, right);
         }
         if (expression instanceof MultiplyOperation) {
             MultiplyOperation operation = (MultiplyOperation) expression;
-            return multiply(evalExpression(operation.lhs), evalExpression(operation.rhs));
+            Literal left = evalExpression(operation.lhs);
+            Literal right = evalExpression(operation.rhs);
+            return multiply(operation, left, right);
         }
-        return new ScalarLiteral(0);
+        expression.setError("Unsupported expression in evaluation.");
+        return null;
     }
 
-    private boolean asBoolean(Literal literal) {
-        return literal instanceof BoolLiteral && ((BoolLiteral) literal).value;
-    }
-
-    private Literal lookup(String name) {
-        Literal value = lookupVariable(name);
-        if (value != null) {
-            return copyLiteral(value);
+    private Literal add(AddOperation operation, Literal left, Literal right) {
+        if (left == null || right == null) {
+            return null;
         }
-        return new ScalarLiteral(0);
-    }
-
-    private Literal add(Literal left, Literal right) {
         if (left instanceof PixelLiteral && right instanceof PixelLiteral) {
             return new PixelLiteral(((PixelLiteral) left).value + ((PixelLiteral) right).value);
         }
@@ -160,10 +187,14 @@ public class Evaluator implements Transform {
         if (left instanceof ScalarLiteral && right instanceof ScalarLiteral) {
             return new ScalarLiteral(((ScalarLiteral) left).value + ((ScalarLiteral) right).value);
         }
-        return new ScalarLiteral(0);
+        operation.setError("Invalid operands for addition.");
+        return null;
     }
 
-    private Literal subtract(Literal left, Literal right) {
+    private Literal subtract(SubtractOperation operation, Literal left, Literal right) {
+        if (left == null || right == null) {
+            return null;
+        }
         if (left instanceof PixelLiteral && right instanceof PixelLiteral) {
             return new PixelLiteral(((PixelLiteral) left).value - ((PixelLiteral) right).value);
         }
@@ -173,10 +204,14 @@ public class Evaluator implements Transform {
         if (left instanceof ScalarLiteral && right instanceof ScalarLiteral) {
             return new ScalarLiteral(((ScalarLiteral) left).value - ((ScalarLiteral) right).value);
         }
-        return new ScalarLiteral(0);
+        operation.setError("Invalid operands for subtraction.");
+        return null;
     }
 
-    private Literal multiply(Literal left, Literal right) {
+    private Literal multiply(MultiplyOperation operation, Literal left, Literal right) {
+        if (left == null || right == null) {
+            return null;
+        }
         if (left instanceof ScalarLiteral && right instanceof ScalarLiteral) {
             return new ScalarLiteral(((ScalarLiteral) left).value * ((ScalarLiteral) right).value);
         }
@@ -192,10 +227,14 @@ public class Evaluator implements Transform {
         if (left instanceof PercentageLiteral && right instanceof ScalarLiteral) {
             return new PercentageLiteral(((PercentageLiteral) left).value * ((ScalarLiteral) right).value);
         }
-        return new ScalarLiteral(0);
+        operation.setError("Invalid operands for multiplication.");
+        return null;
     }
 
     private Literal copyLiteral(Literal literal) {
+        if (literal == null) {
+            return null;
+        }
         if (literal instanceof PixelLiteral) {
             return new PixelLiteral(((PixelLiteral) literal).value);
         }
@@ -211,7 +250,7 @@ public class Evaluator implements Transform {
         if (literal instanceof ColorLiteral) {
             return new ColorLiteral(((ColorLiteral) literal).value);
         }
-        return new ScalarLiteral(0);
+        return null;
     }
 
     private Literal lookupVariable(String name) {

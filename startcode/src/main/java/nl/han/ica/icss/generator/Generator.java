@@ -47,7 +47,10 @@ public class Generator {
 
 		for (ASTNode node : rule.body) {
 			if (node instanceof Declaration) {
-				writeDeclaration(css, (Declaration) node);
+				Declaration declaration = (Declaration) node;
+				if (!declaration.hasError() && declaration.expression != null) {
+					writeDeclaration(css, declaration);
+				}
 			}
 		}
 
@@ -63,6 +66,9 @@ public class Generator {
 	}
 
 	private String expressionToCss(Expression expression) {
+		if (expression == null) {
+			return "";
+		}
 		if (expression instanceof PixelLiteral) {
 			return ((PixelLiteral) expression).value + "px";
 		}
