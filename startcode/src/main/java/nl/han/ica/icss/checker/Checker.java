@@ -31,9 +31,11 @@ import java.util.HashMap;
 public class Checker {
 
     private IHANLinkedList<HashMap<String, ExpressionType>> variableTypes;
+    private HashMap<String, ExpressionType> fixedVariableTypes;
 
     public void check(AST ast) {
         variableTypes = new HANLinkedList<>();
+        fixedVariableTypes = new HashMap<>();
         pushScope();
         checkStylesheet(ast.root);
         popScope();
@@ -119,8 +121,25 @@ public class Checker {
     }
 
     private void checkVariableAssignment(VariableAssignment assignment) {
+        String name = assignment.name.name;
         ExpressionType expressionType = inferType(assignment.expression);
-        declareVariable(assignment.name.name, expressionType);
+        enforceConsistentVariableType(assignment, name, expressionType);
+        declareVariable(name, expressionType);
+    }
+
+    private void enforceConsistentVariableType(VariableAssignment assignment, String name,
+            ExpressionType expressionType) {
+        if (expressionType == ExpressionType.UNDEFINED) {
+            return;
+        }
+        if (fixedVariableTypes.containsKey(name)) {
+            if (fixedVariableTypes.get(name) != expressionType) {
+                assignment.setError(
+                        "Variable must keep a single type for its lifetime; this conflicts with an earlier assignment.");
+            }
+        } else {
+            fixedVariableTypes.put(name, expressionType);
+        }
     }
 
     private void checkDeclaration(Declaration declaration) {
@@ -256,7 +275,8 @@ public class Checker {
             return ExpressionType.SCALAR;
         }
 
-        operationNode.setError("Division requires same-unit operands (yielding a scalar) or a pixel/percentage divided by a scalar.");
+        operationNode.setError(
+                "Division requires same-unit operands (yielding a scalar) or a pixel/percentage divided by a scalar.");
         return ExpressionType.UNDEFINED;
     }
 

@@ -1,0 +1,6 @@
+Size := 10px;
+Size := 40px;
+
+p {
+  width: Size;
+}
