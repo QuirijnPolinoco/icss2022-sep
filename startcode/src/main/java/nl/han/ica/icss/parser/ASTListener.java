@@ -12,6 +12,7 @@ import nl.han.ica.datastructures.IHANStack;
 import nl.han.ica.icss.ast.*;
 import nl.han.ica.icss.ast.literals.*;
 import nl.han.ica.icss.ast.operations.AddOperation;
+import nl.han.ica.icss.ast.operations.DivideOperation;
 import nl.han.ica.icss.ast.operations.MultiplyOperation;
 import nl.han.ica.icss.ast.operations.SubtractOperation;
 import nl.han.ica.icss.ast.selectors.ClassSelector;
@@ -83,6 +84,19 @@ public class ASTListener extends ICSSBaseListener {
 			if (child instanceof TerminalNode) {
 				Token token = ((TerminalNode) child).getSymbol();
 				if (token.getType() == ICSSParser.PLUS || token.getType() == ICSSParser.MIN) {
+					operators.add(token.getType());
+				}
+			}
+		}
+		return operators;
+	}
+
+	private List<Integer> readMultiplicativeOperators(ICSSParser.MultiplicativeExpressionContext ctx) {
+		List<Integer> operators = new ArrayList<>();
+		for (ParseTree child : ctx.children) {
+			if (child instanceof TerminalNode) {
+				Token token = ((TerminalNode) child).getSymbol();
+				if (token.getType() == ICSSParser.MUL || token.getType() == ICSSParser.DIV) {
 					operators.add(token.getType());
 				}
 			}
@@ -224,13 +238,26 @@ public class ASTListener extends ICSSBaseListener {
 			return;
 		}
 
-		Expression[] operands = popExpressionsInOrder(operandCount, "multiplication");
+		Expression[] operands = popExpressionsInOrder(operandCount, "multiplication/division");
+		List<Integer> operators = readMultiplicativeOperators(ctx);
+		if (operators.size() != operandCount - 1) {
+			throw new IllegalStateException("Mismatch between multiplicative operands and operators.");
+		}
+
 		Expression result = operands[0];
 		for (int i = 1; i < operands.length; i++) {
-			MultiplyOperation mul = new MultiplyOperation();
-			mul.addChild(result);
-			mul.addChild(operands[i]);
-			result = mul;
+			int op = operators.get(i - 1);
+			if (op == ICSSParser.MUL) {
+				MultiplyOperation mul = new MultiplyOperation();
+				mul.addChild(result);
+				mul.addChild(operands[i]);
+				result = mul;
+			} else {
+				DivideOperation div = new DivideOperation();
+				div.addChild(result);
+				div.addChild(operands[i]);
+				result = div;
+			}
 		}
 		expressionStack.push(result);
 	}

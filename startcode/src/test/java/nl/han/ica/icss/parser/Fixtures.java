@@ -6,6 +6,7 @@ import nl.han.ica.icss.ast.literals.ColorLiteral;
 import nl.han.ica.icss.ast.literals.PixelLiteral;
 import nl.han.ica.icss.ast.literals.ScalarLiteral;
 import nl.han.ica.icss.ast.operations.AddOperation;
+import nl.han.ica.icss.ast.operations.DivideOperation;
 import nl.han.ica.icss.ast.operations.MultiplyOperation;
 import nl.han.ica.icss.ast.selectors.ClassSelector;
 import nl.han.ica.icss.ast.selectors.IdSelector;
@@ -185,6 +186,23 @@ public class Fixtures {
 				.addChild(new ClassSelector(".menu"))
 				.addChild((new Declaration("color"))
 						.addChild(new ColorLiteral("#000000"))));
+		return new AST(stylesheet);
+	}
+
+	/** ICSS extension: division (same precedence as multiplication). */
+	public static AST uncheckedDivideFeature() {
+		Stylesheet stylesheet = new Stylesheet();
+		/*
+		 * p {
+		 * width: 100px / 2;
+		 * }
+		 */
+		stylesheet.addChild((new Stylerule())
+				.addChild(new TagSelector("p"))
+				.addChild((new Declaration("width"))
+						.addChild((new DivideOperation())
+								.addChild(new PixelLiteral("100px"))
+								.addChild(new ScalarLiteral("2")))));
 		return new AST(stylesheet);
 	}
 

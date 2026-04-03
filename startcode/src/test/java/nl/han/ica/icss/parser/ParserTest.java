@@ -81,4 +81,11 @@ class ParserTest {
 		AST exp = Fixtures.uncheckedLevel3();
 		assertEquals(exp,sut);
 	}
+
+	@Test
+	void testParseDivideFeature() throws IOException {
+		AST sut = parseTestFile("divide.icss");
+		AST exp = Fixtures.uncheckedDivideFeature();
+		assertEquals(exp, sut);
+	}
 }

@@ -18,6 +18,7 @@ import nl.han.ica.icss.ast.literals.PercentageLiteral;
 import nl.han.ica.icss.ast.literals.PixelLiteral;
 import nl.han.ica.icss.ast.literals.ScalarLiteral;
 import nl.han.ica.icss.ast.operations.AddOperation;
+import nl.han.ica.icss.ast.operations.DivideOperation;
 import nl.han.ica.icss.ast.operations.MultiplyOperation;
 import nl.han.ica.icss.ast.operations.SubtractOperation;
 
@@ -170,6 +171,12 @@ public class Evaluator implements Transform {
             Literal right = evalExpression(operation.rhs);
             return multiply(operation, left, right);
         }
+        if (expression instanceof DivideOperation) {
+            DivideOperation operation = (DivideOperation) expression;
+            Literal left = evalExpression(operation.lhs);
+            Literal right = evalExpression(operation.rhs);
+            return divide(operation, left, right);
+        }
         expression.setError("Unsupported expression in evaluation.");
         return null;
     }
@@ -228,6 +235,54 @@ public class Evaluator implements Transform {
             return new PercentageLiteral(((PercentageLiteral) left).value * ((ScalarLiteral) right).value);
         }
         operation.setError("Invalid operands for multiplication.");
+        return null;
+    }
+
+    private Literal divide(DivideOperation operation, Literal left, Literal right) {
+        if (left == null || right == null) {
+            return null;
+        }
+        if (left instanceof ScalarLiteral && right instanceof ScalarLiteral) {
+            int divisor = ((ScalarLiteral) right).value;
+            if (divisor == 0) {
+                operation.setError("Division by zero.");
+                return null;
+            }
+            return new ScalarLiteral(((ScalarLiteral) left).value / divisor);
+        }
+        if (left instanceof PixelLiteral && right instanceof ScalarLiteral) {
+            int divisor = ((ScalarLiteral) right).value;
+            if (divisor == 0) {
+                operation.setError("Division by zero.");
+                return null;
+            }
+            return new PixelLiteral(((PixelLiteral) left).value / divisor);
+        }
+        if (left instanceof PercentageLiteral && right instanceof ScalarLiteral) {
+            int divisor = ((ScalarLiteral) right).value;
+            if (divisor == 0) {
+                operation.setError("Division by zero.");
+                return null;
+            }
+            return new PercentageLiteral(((PercentageLiteral) left).value / divisor);
+        }
+        if (left instanceof PixelLiteral && right instanceof PixelLiteral) {
+            int divisor = ((PixelLiteral) right).value;
+            if (divisor == 0) {
+                operation.setError("Division by zero.");
+                return null;
+            }
+            return new ScalarLiteral(((PixelLiteral) left).value / divisor);
+        }
+        if (left instanceof PercentageLiteral && right instanceof PercentageLiteral) {
+            int divisor = ((PercentageLiteral) right).value;
+            if (divisor == 0) {
+                operation.setError("Division by zero.");
+                return null;
+            }
+            return new ScalarLiteral(((PercentageLiteral) left).value / divisor);
+        }
+        operation.setError("Invalid operands for division.");
         return null;
     }
 

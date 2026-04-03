@@ -21,6 +21,7 @@ import nl.han.ica.icss.ast.literals.PercentageLiteral;
 import nl.han.ica.icss.ast.literals.PixelLiteral;
 import nl.han.ica.icss.ast.literals.ScalarLiteral;
 import nl.han.ica.icss.ast.operations.AddOperation;
+import nl.han.ica.icss.ast.operations.DivideOperation;
 import nl.han.ica.icss.ast.operations.MultiplyOperation;
 import nl.han.ica.icss.ast.operations.SubtractOperation;
 import nl.han.ica.icss.ast.types.ExpressionType;
@@ -180,6 +181,9 @@ public class Checker {
         if (operation instanceof MultiplyOperation) {
             return checkMultiplyType(operation, lhsType, rhsType);
         }
+        if (operation instanceof DivideOperation) {
+            return checkDivideType(operation, lhsType, rhsType);
+        }
         return ExpressionType.UNDEFINED;
     }
 
@@ -223,6 +227,36 @@ public class Checker {
         }
 
         operationNode.setError("Multiplication requires at least one scalar operand.");
+        return ExpressionType.UNDEFINED;
+    }
+
+    private ExpressionType checkDivideType(Expression operationNode, ExpressionType lhsType, ExpressionType rhsType) {
+        if (lhsType == ExpressionType.UNDEFINED || rhsType == ExpressionType.UNDEFINED) {
+            return ExpressionType.UNDEFINED;
+        }
+
+        if (isIllegalArithmeticType(lhsType) || isIllegalArithmeticType(rhsType)) {
+            operationNode.setError("Color and boolean values cannot be used in arithmetic operations.");
+            return ExpressionType.UNDEFINED;
+        }
+
+        if (lhsType == ExpressionType.SCALAR && rhsType == ExpressionType.SCALAR) {
+            return ExpressionType.SCALAR;
+        }
+        if (lhsType == ExpressionType.PIXEL && rhsType == ExpressionType.SCALAR) {
+            return ExpressionType.PIXEL;
+        }
+        if (lhsType == ExpressionType.PERCENTAGE && rhsType == ExpressionType.SCALAR) {
+            return ExpressionType.PERCENTAGE;
+        }
+        if (lhsType == ExpressionType.PIXEL && rhsType == ExpressionType.PIXEL) {
+            return ExpressionType.SCALAR;
+        }
+        if (lhsType == ExpressionType.PERCENTAGE && rhsType == ExpressionType.PERCENTAGE) {
+            return ExpressionType.SCALAR;
+        }
+
+        operationNode.setError("Division requires same-unit operands (yielding a scalar) or a pixel/percentage divided by a scalar.");
         return ExpressionType.UNDEFINED;
     }
 

@@ -38,6 +38,7 @@ COLON: ':';
 PLUS: '+';
 MIN: '-';
 MUL: '*';
+DIV: '/';
 ASSIGNMENT_OPERATOR: ':=';
 
 
@@ -67,6 +68,6 @@ elseClause: ELSE OPEN_BRACE ruleBody CLOSE_BRACE;
 // --- Expressions (bottom-up: primary -> multiply -> add/sub, left-associative) ---
 
 additiveExpression: multiplicativeExpression ( ( PLUS | MIN ) multiplicativeExpression )*;
-multiplicativeExpression: primaryExpression ( MUL primaryExpression )*;
+multiplicativeExpression: primaryExpression ( ( MUL | DIV ) primaryExpression )*;
 primaryExpression: literal | variableReference;
 literal : TRUE | FALSE | COLOR | PIXELSIZE | PERCENTAGE | SCALAR;
